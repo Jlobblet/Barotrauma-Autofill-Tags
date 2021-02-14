@@ -23,7 +23,7 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
       - name: Upload binaries
-        uses: actions/upload-release-artifact@v1
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
