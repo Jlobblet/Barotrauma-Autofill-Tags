@@ -1,0 +1,2 @@
+Autofill Tags are used for adding items to [[Containers]] from a random pool of items.
+These are added to the <code>tags</code> parameter in the [[Submarine Editor]].
