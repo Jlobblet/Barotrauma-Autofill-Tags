@@ -107,7 +107,7 @@ let generateTable (docs: XDocument list) tag =
                           $"| {{{{hyperlink|%s{itemName}}}}}"
                           $"| %i{min}"
                           $"| %i{max}"
-                          $"| {p}" ]
+                          $"| {p:P1}" ]
                     | None -> [])))
 
     let footer = [ "|}" ]
