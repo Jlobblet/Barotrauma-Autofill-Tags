@@ -25,22 +25,25 @@ Target.create "Build"
 Target.create "Publish"
 <| fun _ ->
     !! "src/**/*.*proj"
-    |> Seq.iter
-        (DotNet.publish (fun settings ->
-            { settings with
-                  SelfContained = Some true
-                  Runtime = Some "win10-x64"
-                  MSBuildParams =
-                      { settings.MSBuildParams with
-                            Properties =
-                                ("PublishSingleFile", "true")
-                                :: settings.MSBuildParams.Properties } }))
+    |> Seq.iter (
+        DotNet.publish
+            (fun settings ->
+                { settings with
+                      SelfContained = Some true
+                      Runtime = Some "win10-x64"
+                      MSBuildParams =
+                          { settings.MSBuildParams with
+                                Properties =
+                                    ("PublishSingleFile", "true")
+                                    :: settings.MSBuildParams.Properties } })
+    )
 
 Target.create "Zip"
 <| fun _ ->
-    ZipFile.CreateFromDirectory
-        (Path.Combine("src", "Barotrauma-Autofill-Tags", "bin", "Release", "net5.0", "win10-x64", "publish"),
-         "Barotrauma-Autofill-Tags.zip")
+    ZipFile.CreateFromDirectory(
+        Path.Combine("src", "Barotrauma-Autofill-Tags", "bin", "Release", "net5.0", "win10-x64", "publish"),
+        "Barotrauma-Autofill-Tags.zip"
+    )
 
 Target.create "All" ignore
 
