@@ -9,7 +9,13 @@ Download the [latest release](https://github.com/Jlobblet/Barotrauma-Autofill-Ta
 
 ## Configuration
 
-Edit the two files `summary.txt` and `template.txt` included.
+Edit `app.config` to change the following settings:
 
-- `summary.txt` contains the text at the top of the page.
-- `template.txt` defines the order the tables should be in, as well as headers.
+| Configuration Key             | Description                                                                                                      |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `BarotraumaLocation`          | The root directory where Barotrauma is installed.                                                                |
+| `OutputLocation` (optional)   | Where to put the output files. Defaults to the working directory.                                                |
+| `SummaryLocation` (optional)  | The location of the summary, which contains the text used at the start of the article. Defaults to `summary.txt` |
+| `TemplateLocation` (optional) | The location of template, which lists tags in order and with headings. Defaults to `template.txt`.               |
+
+Additionally, default versions of `summary.txt` and `template.txt` are included, but they are not guaranteed to be up to date.
