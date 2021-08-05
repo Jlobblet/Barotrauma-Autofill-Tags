@@ -4,18 +4,14 @@ open System
 open System.IO
 open System.Text
 open System.Xml.Linq
+open Barotrauma_Autofill_Tags
+open Barotrauma_Autofill_Tags.Settings
+open FSharp.XExtensions
 
 let (|Header|_|) (str: string) =
     if str.StartsWith "== " && str.EndsWith " =="
     then Some(str.Substring(3, str.Length - 6))
     else None
-
-let ContentDirectory =
-    Path.Combine("C:", "Program Files (x86)", "Steam", "steamapps", "common", "Barotrauma", "Content")
-
-let EnglishText =
-    Path.Combine(ContentDirectory, "Texts", "English", "EnglishVanilla.xml")
-    |> XDocument.Load
 
 let getAllFiles dir =
     Directory.GetFiles(dir, "*.xml", SearchOption.AllDirectories)
@@ -23,8 +19,8 @@ let getAllFiles dir =
 
 let openFile (file: string) = XDocument.Load(file)
 
-let getItemNameFromIdentifier identifier =
-    EnglishText.Root.Elements()
+let getItemNameFromIdentifier (text: XDocument) identifier =
+    text.Root.Elements()
     |> Seq.tryFind (fun e -> e.Name.LocalName = $"entityname.%s{identifier}")
     |> Option.fold (fun _ e -> e.Value) identifier
 
@@ -36,12 +32,12 @@ let parseArrayAttribute (s: string) =
     |> Seq.toList
 
 let getAttributeValueSafe (name: string) (element: XElement) =
-    element.Attribute(name)
+    element.Attribute name
     |> function
     | null -> None
     | attr -> Some attr.Value
 
-let generateTable (docs: XDocument list) tag =
+let generateTable text (docs: XDocument list) tag =
     let header =
         [ "{| class=\"wikitable\""
           "|-"
@@ -72,8 +68,7 @@ let generateTable (docs: XDocument list) tag =
                 |> List.ofSeq
                 |> List.collect (fun container ->
                     let itemName =
-                        getItemNameFromIdentifier
-                        <| item.Attribute("identifier").Value
+                        getItemNameFromIdentifier text <| item.Attribute("identifier").Value
 
                     let initMin =
                         getAttributeValueSafe "minamount" container
@@ -94,7 +89,7 @@ let generateTable (docs: XDocument list) tag =
                         | None, Some v when v > 0 -> Some 1.
                         | Some v, _ -> Some v
 
-                    let (min, max) =
+                    let min, max =
                         match initMin, initMax with
                         | None, None -> 1, 1
                         | Some min, Some max -> min, max
@@ -115,8 +110,8 @@ let generateTable (docs: XDocument list) tag =
     List.concat [ header; middle; footer ]
     |> String.concat Environment.NewLine
 
-let makePageBody docs lines =
-    let generateTable' = generateTable docs
+let makePageBody text docs lines =
+    let generateTable' = generateTable text docs
     let version = "0.12.0.2"
 
     let summary =
@@ -129,39 +124,39 @@ let makePageBody docs lines =
     let listOfTags = StringBuilder()
 
     listOfTags.AppendLine "== List of Tags =="
-    |> ignore
+    |> ignore<StringBuilder>
 
     listOfTags.AppendLine "Valid tags include:"
-    |> ignore
+    |> ignore<StringBuilder>
 
-    listOfTags.AppendLine "" |> ignore
+    listOfTags.AppendLine "" |> ignore<StringBuilder>
 
     let autofillTables = StringBuilder()
 
     autofillTables.AppendLine "= Autofill Tables ="
-    |> ignore
+    |> ignore<StringBuilder>
 
-    autofillTables.AppendLine "" |> ignore
+    autofillTables.AppendLine "" |> ignore<StringBuilder>
 
     let rec inner linesLeft =
         match linesLeft with
         | [] -> ()
         | Header category :: rest ->
-            listOfTags.AppendLine "  " |> ignore
+            listOfTags.AppendLine "  " |> ignore<StringBuilder>
 
             autofillTables.AppendLine $"== %s{category} =="
-            |> ignore
+            |> ignore<StringBuilder>
 
             inner rest
         | tag :: rest ->
             listOfTags.AppendLine $" [[#%s{tag}|%s{tag}]]"
-            |> ignore
+            |> ignore<StringBuilder>
 
             autofillTables.AppendLine $"=== %s{tag} ==="
-            |> ignore
+            |> ignore<StringBuilder>
 
             autofillTables.AppendLine(generateTable' tag)
-            |> ignore
+            |> ignore<StringBuilder>
 
             inner rest
 
@@ -174,8 +169,16 @@ let makePageBody docs lines =
 
 [<EntryPoint>]
 let main argv =
+    let settings = Settings.FromArgv argv
+    
+    let contentDirectory = Path.Combine(settings.BarotraumaLocation, "Content")
+    
+    let EnglishText =
+        Path.Combine(contentDirectory, "Texts", "English", "EnglishVanilla.xml")
+        |> XDocument.Load
+    
     let docs =
-        Path.Combine(ContentDirectory, "Items")
+        Path.Combine(contentDirectory, "Items")
         |> getAllFiles
         |> List.map openFile
 
@@ -194,9 +197,7 @@ let main argv =
     let template =
         File.ReadAllLines "template.txt" |> List.ofArray
 
-    //    if (template |> List.filter (not << ))
-
-    let article = template |> makePageBody docs
+    let article = template |> makePageBody EnglishText docs
 
     File.WriteAllText("Autofill Tags.txt", article)
 

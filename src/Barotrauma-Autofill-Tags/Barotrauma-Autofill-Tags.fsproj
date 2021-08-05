@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="XExtensions.fs" />
+        <Compile Include="Settings.fs" />
         <Compile Include="Program.fs" />
         <Content Include="template.txt">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -16,6 +16,14 @@
         <Content Include="summary.txt">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Include="app.config">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Argu" Version="6.1.1" />
+      <PackageReference Include="FSharp.XExtensions" Version="1.2.0" />
     </ItemGroup>
 
 </Project>
