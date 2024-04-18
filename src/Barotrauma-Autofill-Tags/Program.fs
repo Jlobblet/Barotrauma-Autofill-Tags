@@ -48,7 +48,7 @@ let generateTable text (docs: XDocument list) tag =
     let middle =
         docs
         |> List.collect (fun doc ->
-            let items = doc.Root.Elements("Item")
+            let items = doc.Root.Elements()
 
             items
             |> List.ofSeq
@@ -179,6 +179,7 @@ let main argv =
         Path.Combine(contentDirectory, "Items")
         |> getAllFiles
         |> List.map openFile
+        |> List.filter (fun doc -> doc.Root.Name.LocalName = "Items")
 
     let allTags =
         docs
