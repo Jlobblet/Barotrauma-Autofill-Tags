@@ -110,9 +110,8 @@ let generateTable text (docs: XDocument list) tag =
     List.concat [ header; middle; footer ]
     |> String.concat Environment.NewLine
 
-let makePageBody text docs lines =
+let makePageBody text docs version lines =
     let generateTable' = generateTable text docs
-    let version = "0.12.0.2"
 
     let summary =
         [ $"{{{{Version|%s{version}}}}}"
@@ -197,7 +196,7 @@ let main argv =
     let template =
         File.ReadAllLines "template.txt" |> List.ofArray
 
-    let article = template |> makePageBody EnglishText docs
+    let article = makePageBody EnglishText docs settings.Version template
 
     File.WriteAllText("Autofill Tags.txt", article)
 
