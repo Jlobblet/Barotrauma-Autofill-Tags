@@ -43,52 +43,45 @@ let generateTable text (docs: XDocument list) tag =
 
     let middle =
         docs
-        |> List.collect (fun doc ->
-            let items = doc.Root.Elements()
+        |> Seq.collect (_.Root.Elements())
+        |> Seq.collect (fun item ->
+            item.Elements("PreferredContainer")
+            |> Seq.filter (fun elt ->
+                [ getAttributeValueSafe "primary"; getAttributeValueSafe "secondary" ]
+                |> List.choose (fun s -> s elt)
+                |> List.collect parseArrayAttribute
+                |> Set.ofList
+                |> Set.contains tag)
+            |> Seq.collect (fun container ->
+                let itemName = getItemNameFromIdentifier text (item.Attribute("identifier").Value)
+                let initMin = getAttributeValueSafe "minamount" container |> Option.map int
+                let initMax = getAttributeValueSafe "maxamount" container |> Option.map int
+                let initProb =
+                    getAttributeValueSafe "spawnprobability" container |> Option.map float
 
-            items
-            |> List.ofSeq
-            |> List.collect (fun item ->
-                let preferredContainers =
-                    item.Elements("PreferredContainer")
-                    |> Seq.filter (fun elt ->
-                        [ getAttributeValueSafe "primary" elt; getAttributeValueSafe "secondary" elt ]
-                        |> List.choose id
-                        |> List.collect parseArrayAttribute
-                        |> Set.ofList
-                        |> Set.contains tag)
+                let prob =
+                    match initProb, initMax with
+                    | None, None -> None
+                    | None, Some v when v < 0 -> None
+                    | None, Some v when v > 0 -> Some 1.
+                    | Some v, _ -> Some v
 
-                preferredContainers
-                |> List.ofSeq
-                |> List.collect (fun container ->
-                    let itemName = getItemNameFromIdentifier text (item.Attribute("identifier").Value)
-                    let initMin = getAttributeValueSafe "minamount" container |> Option.map int
-                    let initMax = getAttributeValueSafe "maxamount" container |> Option.map int
-                    let initProb =
-                        getAttributeValueSafe "spawnprobability" container |> Option.map float
+                let min, max =
+                    match initMin, initMax with
+                    | None, None -> 1, 1
+                    | Some min, Some max -> min, max
+                    | Some min, None -> min, 0
+                    | None, Some max -> 0, max
 
-                    let prob =
-                        match initProb, initMax with
-                        | None, None -> None
-                        | None, Some v when v <= 0 -> None
-                        | None, Some v when v > 0 -> Some 1.
-                        | Some v, _ -> Some v
-
-                    let min, max =
-                        match initMin, initMax with
-                        | None, None -> 1, 1
-                        | Some min, Some max -> min, max
-                        | Some min, None -> min, 0
-                        | None, Some max -> 0, max
-
-                    match prob with
-                    | Some p ->
-                        [ "|-"
-                          $"| {{{{hyperlink|%s{itemName}}}}}"
-                          $"| %i{min}"
-                          $"| %i{max}"
-                          $"| {p:P1}" ]
-                    | None -> [])))
+                match prob with
+                | Some p ->
+                    [ "|-"
+                      $"| {{{{hyperlink|%s{itemName}}}}}"
+                      $"| %i{min}"
+                      $"| %i{max}"
+                      $"| {p:P1}" ]
+                | None -> []))
+        |> List.ofSeq
 
     let footer = [ "|}" ]
 
