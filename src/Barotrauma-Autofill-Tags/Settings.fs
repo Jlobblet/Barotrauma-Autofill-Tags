@@ -10,6 +10,7 @@ type Arguments =
     | [<Unique; CustomAppSettings("TemplateLocation")>] TemplateLocation of path: string
     | [<Unique; CustomAppSettings("BarotraumaLocation")>] BarotraumaLocation of path: string
     | [<Unique; CustomAppSettings("Version")>] Version of string
+
     interface IArgParserTemplate with
         member s.Usage =
             match s with
@@ -20,13 +21,14 @@ type Arguments =
             | Version _ -> "The version number of Barotrauma to include in the generated output"
 
 let errorHandler =
-    ProcessExiter
-        (colorizer = function
-        | ErrorCode.HelpText -> None
-        | _ -> Some ConsoleColor.Red)
+    ProcessExiter(
+        colorizer =
+            function
+            | ErrorCode.HelpText -> None
+            | _ -> Some ConsoleColor.Red
+    )
 
-let Parser =
-    ArgumentParser.Create<Arguments>(errorHandler = errorHandler)
+let Parser = ArgumentParser.Create<Arguments>(errorHandler = errorHandler)
 
 [<Struct>]
 type Settings =
@@ -35,12 +37,20 @@ type Settings =
       TemplateLocation: string
       BarotraumaLocation: string
       Version: string }
+
     static member FromArgv argv =
         let results = Parser.Parse argv
-        
-        let outputLocation = results.TryGetResult <@ OutputLocation @> |> Option.defaultValue "."
-        let summaryLocation = results.TryGetResult <@ SummaryLocation @> |> Option.defaultValue "summary.txt"
-        let templateLocation = results.TryGetResult <@ TemplateLocation @> |> Option.defaultValue "template.txt"
+
+        let outputLocation =
+            results.TryGetResult <@ OutputLocation @> |> Option.defaultValue "."
+
+        let summaryLocation =
+            results.TryGetResult <@ SummaryLocation @> |> Option.defaultValue "summary.txt"
+
+        let templateLocation =
+            results.TryGetResult <@ TemplateLocation @>
+            |> Option.defaultValue "template.txt"
+
         let barotraumaLocation = results.GetResult <@ BarotraumaLocation @>
         let version = results.GetResult <@ Version @>
 
