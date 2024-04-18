@@ -6,7 +6,6 @@ open System.Text
 open System.Xml.Linq
 open Barotrauma_Autofill_Tags
 open Barotrauma_Autofill_Tags.Settings
-open FSharp.XExtensions
 
 let (|Header|_|) (str: string) =
     if str.StartsWith "== " && str.EndsWith " =="
