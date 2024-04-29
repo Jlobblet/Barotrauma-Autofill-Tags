@@ -2,127 +2,104 @@
 
 open System
 open System.IO
-open System.Text
 open System.Xml.Linq
 open Barotrauma_Autofill_Tags.Settings
 
-let (|Header|_|) (str: string) =
-    if str.StartsWith "== " && str.EndsWith " ==" then
-        Some(str.Substring(3, str.Length - 6))
-    else
-        None
-
 let getAllFiles dir =
-    Directory.GetFiles(dir, "*.xml", SearchOption.AllDirectories) |> Array.toList
-
-let openFile (file: string) = XDocument.Load(file)
-
-let getItemNameFromIdentifier (text: XDocument) identifier =
-    text.Root.Elements()
-    |> Seq.tryFind (fun e -> e.Name.LocalName = $"entityname.%s{identifier}")
-    |> Option.fold (fun _ e -> e.Value) identifier
+    Directory.GetFiles(dir, "*.xml", SearchOption.AllDirectories)
 
 let parseArrayAttribute (s: string) =
     s.Split(",", StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
-    |> Seq.toList
 
 let getAttributeValueSafe (name: string) (element: XElement) =
-    element.Attribute name
-    |> function
-        | null -> None
-        | attr -> Some attr.Value
+    match element.Attribute name with
+    | null -> None
+    | attr -> Some attr.Value
 
-let generateTable text (docs: XDocument list) tag =
-    let header =
-        [ "{| class=\"wikitable\""
-          "|-"
-          "| Item Name"
-          "| Min Number Spawned"
-          "| Max Number Spawned"
-          "| Probability of Item Being Spawned" ]
+type SpawnAmount =
+    | Exact of int
+    | Range of min: int * max: int
 
-    let middle =
-        docs
-        |> Seq.collect (_.Root.Elements())
-        |> Seq.collect (fun item ->
+module SpawnAmount =
+    let format i = function
+        | Exact n -> $"c%i{i}amount = %i{n}"
+        | Range (min, max) -> $"c%i{i}minamount = %i{min} | c%i{i}maxamount = %i{max}"
+
+type PreferredContainer =
+    { Type: string
+      Tag: string
+      SpawnProbability: Decimal
+      Amount: SpawnAmount
+      NotCampaign: bool }
+    
+module PreferredContainer =
+    let format i { Type = type'
+                   Tag = tag
+                   SpawnProbability = spawnProbability
+                   NotCampaign = notCampaign
+                   Amount = amount } =
+        [ $"c%i{i}type = %s{type'}"
+          $"c%i{i}tag = %s{tag}"
+          $"c%i{i}spawnprobability = {spawnProbability}"
+          $"c%i{i}notcampaign = {notCampaign}"
+          SpawnAmount.format i amount ]
+        |> String.concat " | "
+
+    let parse (element: XElement): PreferredContainer[] =
+        
+        [|"primary"; "secondary"|]
+        |> Array.collect (fun t ->
+            getAttributeValueSafe t element
+            |> Option.map (fun raw ->
+                parseArrayAttribute raw
+                |> Array.map (fun tag -> t, tag))
+            |> Option.defaultValue [||])
+        |> Array.map (fun (type', tag) ->
+            let prob = getAttributeValueSafe "spawnprobability" element |> Option.map Decimal.Parse
+            let amount = getAttributeValueSafe "amount" element |> Option.map int
+            let maxAmount = getAttributeValueSafe "maxamount" element |> Option.map int
+            let minAmount = getAttributeValueSafe "minamount" element |> Option.fold (fun _ -> int) 0
+            let campaignOnly = getAttributeValueSafe "campaignonly" element |> Option.fold (fun _ -> bool.Parse) false
+
+            let prob, spawnAmount =
+                match prob, amount, maxAmount with
+                // if spawn probability and amount is defined, use it
+                | Some(p), Some(a), _ when a > 0 -> p, SpawnAmount.Exact a
+                | Some(p), _, Some(ma) when ma > 0 -> p, SpawnAmount.Range(minAmount, max minAmount ma)
+                // if spawn probability is not defined but amount is, assume the probability is 1
+                | None, Some(a), _ when a > 0 -> 1m, SpawnAmount.Exact a
+                | None, _, Some(ma) when ma > 0 -> 1m, SpawnAmount.Range(minAmount, max minAmount ma)
+                // spawn probability defined but amount isn't, assume amount is 1
+                | Some(p), None, None -> p, SpawnAmount.Exact 1
+                // otherwise, set the probability to 0 and the amount to 1
+                | _ -> 0m, SpawnAmount.Exact 1
+
+            { Type = type'
+              Tag = tag
+              SpawnProbability = prob
+              Amount = spawnAmount
+              NotCampaign = campaignOnly })
+
+let processItem (item: XElement) =
+    let itemIdentifier = item.Attribute("identifier")
+    
+    if itemIdentifier = null then
+        None
+    else
+        let details =
             item.Elements("PreferredContainer")
-            |> Seq.filter (fun elt ->
-                [ getAttributeValueSafe "primary"; getAttributeValueSafe "secondary" ]
-                |> List.choose (fun s -> s elt)
-                |> List.collect parseArrayAttribute
-                |> Set.ofList
-                |> Set.contains tag)
-            |> Seq.collect (fun container ->
-                let itemName = getItemNameFromIdentifier text (item.Attribute("identifier").Value)
-                let initMin = getAttributeValueSafe "minamount" container |> Option.map int
-                let initMax = getAttributeValueSafe "maxamount" container |> Option.map int
-                let initProb =
-                    getAttributeValueSafe "spawnprobability" container |> Option.map float
+            |> Seq.collect PreferredContainer.parse
+            |> Seq.mapi (fun i -> PreferredContainer.format (i + 1))
 
-                let prob =
-                    match initProb, initMax with
-                    | None, None -> None
-                    | None, Some v when v < 0 -> None
-                    | None, Some v when v > 0 -> Some 1.
-                    | Some v, _ -> Some v
+        if Seq.isEmpty details then
+            None
+        else
+            Some $"""{{{{afr | %s{itemIdentifier.Value} | %s{String.concat " | " details} }}}}"""
 
-                let min, max =
-                    match initMin, initMax with
-                    | None, None -> 1, 1
-                    | Some min, Some max -> min, max
-                    | Some min, None -> min, 0
-                    | None, Some max -> 0, max
-
-                match prob with
-                | Some p ->
-                    [ "|-"
-                      $"| {{{{hyperlink|%s{itemName}}}}}"
-                      $"| %i{min}"
-                      $"| %i{max}"
-                      $"| {p:P1}" ]
-                | None -> []))
-        |> List.ofSeq
-
-    let footer = [ "|}" ]
-
-    List.concat [ header; middle; footer ] |> String.concat Environment.NewLine
-
-let makePageBody text docs version lines =
-    let generateTable' = generateTable text docs
-
-    let summary =
-        [ $"{{{{Version|%s{version}}}}}"
-          File.ReadAllText "summary.txt"
-          ""
-          "__TOC__" ]
-        |> String.concat Environment.NewLine
-
-    let listOfTags = StringBuilder()
-
-    listOfTags.AppendLine "== List of Tags ==" |> ignore<StringBuilder>
-    listOfTags.AppendLine "Valid tags include:" |> ignore<StringBuilder>
-    listOfTags.AppendLine "" |> ignore<StringBuilder>
-
-    let autofillTables = StringBuilder()
-    autofillTables.AppendLine "= Autofill Tables =" |> ignore<StringBuilder>
-    autofillTables.AppendLine "" |> ignore<StringBuilder>
-
-    let rec inner linesLeft =
-        match linesLeft with
-        | [] -> ()
-        | Header category :: rest ->
-            listOfTags.AppendLine "  " |> ignore<StringBuilder>
-            autofillTables.AppendLine $"== %s{category} ==" |> ignore<StringBuilder>
-            inner rest
-        | tag :: rest ->
-            listOfTags.AppendLine $" [[#%s{tag}|%s{tag}]]" |> ignore<StringBuilder>
-            autofillTables.AppendLine $"=== %s{tag} ===" |> ignore<StringBuilder>
-            autofillTables.AppendLine(generateTable' tag) |> ignore<StringBuilder>
-            inner rest
-
-    inner lines
-
-    [ summary; listOfTags.ToString(); autofillTables.ToString() ]
+let makePageBody docs =
+    docs
+    |> Seq.collect (fun (doc: XDocument) -> doc.Root.Elements() |> Seq.map processItem)
+    |> Seq.choose id
     |> String.concat Environment.NewLine
 
 [<EntryPoint>]
@@ -131,15 +108,11 @@ let main argv =
 
     let contentDirectory = Path.Combine(settings.BarotraumaLocation, "Content")
 
-    let EnglishText =
-        Path.Combine(contentDirectory, "Texts", "English", "EnglishVanilla.xml")
-        |> XDocument.Load
-
     let docs =
         Path.Combine(contentDirectory, "Items")
         |> getAllFiles
-        |> List.map openFile
-        |> List.filter (fun doc -> doc.Root.Name.LocalName = "Items")
+        |> Array.map XDocument.Load
+        |> Array.filter (fun doc -> doc.Root.Name.LocalName = "Items")
 
     let allTags =
         docs
@@ -152,9 +125,7 @@ let main argv =
 
     File.WriteAllLines("tags.txt", allTags)
 
-    let template = File.ReadAllLines "template.txt" |> List.ofArray
-
-    let article = makePageBody EnglishText docs settings.Version template
+    let article = makePageBody docs
 
     File.WriteAllText("Autofill Tags.txt", article)
 
