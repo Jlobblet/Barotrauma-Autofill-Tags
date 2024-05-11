@@ -21,9 +21,10 @@ type SpawnAmount =
     | Range of min: int * max: int
 
 module SpawnAmount =
-    let format i = function
+    let format i =
+        function
         | Exact n -> $"c%i{i}amount = %i{n}"
-        | Range (min, max) -> $"c%i{i}minamount = %i{min} | c%i{i}maxamount = %i{max}"
+        | Range(min, max) -> $"c%i{i}minamount = %i{min} | c%i{i}maxamount = %i{max}"
 
 type PreferredContainer =
     { Type: string
@@ -31,13 +32,16 @@ type PreferredContainer =
       SpawnProbability: Decimal
       Amount: SpawnAmount
       NotCampaign: bool }
-    
+
 module PreferredContainer =
-    let format i { Type = type'
-                   Tag = tag
-                   SpawnProbability = spawnProbability
-                   NotCampaign = notCampaign
-                   Amount = amount } =
+    let format
+        i
+        { Type = type'
+          Tag = tag
+          SpawnProbability = spawnProbability
+          NotCampaign = notCampaign
+          Amount = amount }
+        =
         [ $"c%i{i}type = %s{type'}"
           $"c%i{i}tag = %s{tag}"
           $"c%i{i}spawnprobability = {spawnProbability}"
@@ -45,21 +49,26 @@ module PreferredContainer =
           SpawnAmount.format i amount ]
         |> String.concat " | "
 
-    let parse (element: XElement): PreferredContainer[] =
-        
-        [|"primary"; "secondary"|]
+    let parse (element: XElement) : PreferredContainer[] =
+
+        [| "primary"; "secondary" |]
         |> Array.collect (fun t ->
             getAttributeValueSafe t element
-            |> Option.map (fun raw ->
-                parseArrayAttribute raw
-                |> Array.map (fun tag -> t, tag))
+            |> Option.map (fun raw -> parseArrayAttribute raw |> Array.map (fun tag -> t, tag))
             |> Option.defaultValue [||])
         |> Array.map (fun (type', tag) ->
-            let prob = getAttributeValueSafe "spawnprobability" element |> Option.map Decimal.Parse
+            let prob =
+                getAttributeValueSafe "spawnprobability" element |> Option.map Decimal.Parse
+
             let amount = getAttributeValueSafe "amount" element |> Option.map int
             let maxAmount = getAttributeValueSafe "maxamount" element |> Option.map int
-            let minAmount = getAttributeValueSafe "minamount" element |> Option.fold (fun _ -> int) 0
-            let campaignOnly = getAttributeValueSafe "campaignonly" element |> Option.fold (fun _ -> bool.Parse) false
+
+            let minAmount =
+                getAttributeValueSafe "minamount" element |> Option.fold (fun _ -> int) 0
+
+            let campaignOnly =
+                getAttributeValueSafe "campaignonly" element
+                |> Option.fold (fun _ -> bool.Parse) false
 
             let prob, spawnAmount =
                 match prob, amount, maxAmount with
@@ -82,7 +91,7 @@ module PreferredContainer =
 
 let processItem (item: XElement) =
     let itemIdentifier = item.Attribute("identifier")
-    
+
     if itemIdentifier = null then
         None
     else
@@ -117,9 +126,7 @@ let main argv =
     let allTags =
         docs
         |> Seq.collect _.Descendants("PreferredContainer")
-        |> Seq.collect (fun xe ->
-            [ "primary"; "secondary" ]
-            |> List.choose (fun c -> getAttributeValueSafe c xe))
+        |> Seq.collect (fun xe -> [ "primary"; "secondary" ] |> List.choose (fun c -> getAttributeValueSafe c xe))
         |> Seq.collect parseArrayAttribute
         |> Set.ofSeq
 
