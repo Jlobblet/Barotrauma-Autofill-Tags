@@ -96,10 +96,10 @@ let processItem (item: XElement) =
         else
             Some $$$"""{{afr | %s{{{itemIdentifier.Value}}} | %s{{{String.concat " | " details}}} }}"""
 
-let makePageBody docs =
+let makePageBody (docs: XDocument seq) =
     docs
-    |> Seq.collect (fun (doc: XDocument) -> doc.Root.Elements() |> Seq.map processItem)
-    |> Seq.choose id
+    |> Seq.collect (_.Root.Elements())
+    |> Seq.choose processItem
     |> String.concat Environment.NewLine
 
 [<EntryPoint>]
@@ -112,11 +112,11 @@ let main argv =
         Path.Combine(contentDirectory, "Items")
         |> getAllFiles
         |> Array.map XDocument.Load
-        |> Array.filter (fun doc -> doc.Root.Name.LocalName = "Items")
+        |> Array.filter _.Root.Name.LocalName.Equals("Items")
 
     let allTags =
         docs
-        |> Seq.collect (fun d -> d.Descendants "PreferredContainer")
+        |> Seq.collect _.Descendants("PreferredContainer")
         |> Seq.collect (fun xe ->
             [ "primary"; "secondary" ]
             |> List.choose (fun c -> getAttributeValueSafe c xe))
