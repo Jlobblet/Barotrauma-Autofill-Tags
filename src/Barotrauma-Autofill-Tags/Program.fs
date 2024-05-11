@@ -118,8 +118,8 @@ let main argv =
         docs
         |> Seq.collect (fun d -> d.Descendants "PreferredContainer")
         |> Seq.collect (fun xe ->
-            [ getAttributeValueSafe "primary" xe; getAttributeValueSafe "secondary" xe ]
-            |> List.choose id)
+            [ "primary"; "secondary" ]
+            |> List.choose (fun c -> getAttributeValueSafe c xe))
         |> Seq.collect parseArrayAttribute
         |> Set.ofSeq
 
