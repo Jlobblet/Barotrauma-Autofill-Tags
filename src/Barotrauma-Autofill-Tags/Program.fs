@@ -94,7 +94,7 @@ let processItem (item: XElement) =
         if Seq.isEmpty details then
             None
         else
-            Some $"""{{{{afr | %s{itemIdentifier.Value} | %s{String.concat " | " details} }}}}"""
+            Some $$$"""{{afr | %s{{{itemIdentifier.Value}}} | %s{{{String.concat " | " details}}} }}"""
 
 let makePageBody docs =
     docs
